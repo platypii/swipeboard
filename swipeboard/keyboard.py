@@ -119,6 +119,11 @@ class Board(Gtk.Window):
         monitor = display.get_primary_monitor() or display.get_monitor(0)
         geo = monitor.get_geometry()
         self.mon = geo
+        # GDK hands us logical pixels; X properties like _NET_WM_STRUT_PARTIAL
+        # are in device pixels. On this 2560x1600 panel that is a factor of 2,
+        # and getting it wrong makes the WM carve the workarea sideways instead
+        # of reserving the bottom.
+        self.scale = monitor.get_scale_factor()
 
         self.width = geo.width
         self.unit_w = self.width / GRID_COLS
@@ -162,13 +167,18 @@ class Board(Gtk.Window):
         except AttributeError:
             return  # not X11
         if on:
-            # The bottom strut is measured from the bottom of the whole X screen,
-            # not of this monitor, so anything below us has to be added on.
-            root = self.get_screen().get_root_window()
-            below = max(0, root.get_height() - (self.mon.y + self.mon.height))
-            vals = [0, 0, 0, self.height + below,
+            # Everything below is in DEVICE pixels. The unit mixing here is a
+            # trap: monitor geometry and window sizes come back from GDK in
+            # logical pixels, but the root window and X properties are device.
+            # Mixing them fed the WM a bottom strut bigger than the screen,
+            # which collapsed the workarea to its minimum instead of erroring.
+            s = self.scale
+            root_h = self.get_screen().get_root_window().get_height()
+            mon_bottom = (self.mon.y + self.mon.height) * s
+            below = max(0, root_h - mon_bottom)   # space under us on a taller screen
+            vals = [0, 0, 0, self.height * s + below,
                     0, 0, 0, 0, 0, 0,
-                    self.mon.x, self.mon.x + self.width - 1]
+                    self.mon.x * s, (self.mon.x + self.width) * s - 1]
             args = ["-id", str(xid), "-f", "_NET_WM_STRUT_PARTIAL", "32c",
                     "-set", "_NET_WM_STRUT_PARTIAL", ",".join(str(v) for v in vals)]
         else:
