@@ -61,7 +61,7 @@ def synth_swipe(
     vertex_sigma: float = 0.35,
     sample_sigma: float = 0.05,
 ) -> list[Point]:
-    col = _collapse(word)
+    col = _collapse(word.lower())  # display casing (Kenny) -> key positions
     ctrl = []
     for ch in col:
         cx, cy = centers[ch]

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import math
 import subprocess
+import time
 
 import cairo
 import gi
@@ -32,6 +33,7 @@ BG = (0.078, 0.086, 0.102)
 KEY_FACE = (0.137, 0.149, 0.176)
 KEY_SPECIAL = (0.106, 0.118, 0.141)
 KEY_PRESSED = (0.227, 0.255, 0.314)
+KEY_ENTER = (0.129, 0.267, 0.420)   # dimmed ACCENT: enter must be findable at a glance
 TEXT = (0.902, 0.910, 0.925)
 TEXT_DIM = (0.612, 0.647, 0.702)
 ACCENT = (0.302, 0.639, 1.0)
@@ -44,6 +46,9 @@ N_CANDIDATES = 5
 
 # Fraction of screen height for the whole board, candidate bar included.
 BOARD_HEIGHT_FRAC = 0.36
+
+# Two space taps within this window collapse to ". " (phone-style).
+DOUBLE_SPACE_S = 0.5
 
 
 def _mono_layout(cr):
@@ -84,6 +89,10 @@ class Board(Gtk.Window):
         self._bar_index: int | None = None
         self._candidates: list[str] = []
         self._last_word: str | None = None
+        # Space-key state machine (see _space_tap).
+        self._swallow_space = False       # a decoded word just typed its own trailing space
+        self._space_at: float | None = None  # when a period-eligible space was last tapped
+        self._wordish = False             # last output ended in a letter/digit
         self._static: cairo.ImageSurface | None = None
         self._static_key: tuple | None = None
 
@@ -235,14 +244,16 @@ class Board(Gtk.Window):
             x, y, w, h = self._key_rect(k)
             pad = max(1.5, self.unit_w * 0.02)
             special = k.kind is not KeyType.CHAR
-            cr.set_source_rgb(*(KEY_SPECIAL if special else KEY_FACE))
+            enter = k.payload == "Return"
+            cr.set_source_rgb(*(KEY_ENTER if enter
+                                else KEY_SPECIAL if special else KEY_FACE))
             _rounded(cr, x + pad, y + pad, w - 2 * pad, h - 2 * pad, h * 0.14)
             cr.fill()
 
             face = self._face(k)
             size = self.row_h * (0.30 if len(face) > 2 else 0.42)
             self._text(cr, layout, face, x, y, w, h, size,
-                       TEXT_DIM if special else TEXT)
+                       TEXT_DIM if special and not enter else TEXT)
         return surf
 
     def _text(self, cr, layout, s, x, y, w, h, size, color) -> None:
@@ -389,6 +400,9 @@ class Board(Gtk.Window):
     # -- actions ---------------------------------------------------------
 
     def _activate(self, k: Key) -> None:
+        if k.kind is KeyType.CHAR and k.payload == " ":
+            self._space_tap()
+            return
         if k.kind is KeyType.CHAR:
             face = k.shifted if (self.out.shift_active() and k.shifted) else k.payload
             if self.out.shift_active() and k.is_letter:
@@ -396,18 +410,64 @@ class Board(Gtk.Window):
             self.out.char(face)
             self._last_word = None
             self._candidates = []
+            self._wordish = face.isalnum()
+            self._swallow_space = False
+            self._space_at = None
         elif k.kind is KeyType.KEYSYM:
             self.out.key(k.payload)
             if k.payload == "BackSpace":
                 self._last_word = None
             else:
                 self._candidates = []
+            self._wordish = False
+            self._swallow_space = False
+            self._space_at = None
         elif k.kind is KeyType.MOD:
             self.out.cycle_mod(k.payload)
         elif k.kind is KeyType.LAYER:
             self.layer = k.payload
         elif k.kind is KeyType.ACTION and k.payload == "hide":
             self.hide_board()
+
+    def _now(self) -> float:
+        return time.monotonic()  # separate so tests can fake the clock
+
+    def _space_tap(self) -> None:
+        """Phone-style space:
+
+        - Ctrl/alt/super+space always passes straight through -- that combo is
+          load-bearing in terminals (tmux prefix, emacs set-mark).
+        - The first space after a decoded word is swallowed: the word already
+          typed its trailing space, so the habitual tap would double it. The
+          buffer is untouched, which also keeps candidate correction valid.
+        - Two taps inside DOUBLE_SPACE_S after a letter/digit collapse the
+          pending space to ". ". Only one space is ever in the buffer at that
+          point, so a single backspace suffices.
+        """
+        if any(m != "shift" for m in self.out.active_mods()):
+            self.out.char(" ")
+            self._swallow_space = False
+            self._space_at = None
+            self._last_word = None
+            self._candidates = []
+            return
+        now = self._now()
+        if self._swallow_space:
+            self._swallow_space = False
+            self._space_at = now
+            return
+        if self._space_at is not None and now - self._space_at <= DOUBLE_SPACE_S:
+            self.out.backspace(1)
+            self.out.text(". ")
+            self._space_at = None
+            self._wordish = False
+            self._last_word = None
+            self._candidates = []
+            return
+        self.out.char(" ")
+        self._space_at = now if self._wordish else None
+        self._last_word = None
+        self._candidates = []
 
     def _commit_swipe(self) -> None:
         ranked = self.decoder.decode(self._path, top=N_CANDIDATES)
@@ -422,6 +482,9 @@ class Board(Gtk.Window):
     def _insert_word(self, word: str) -> None:
         self.out.text(word + " ")
         self._last_word = word
+        self._swallow_space = True
+        self._wordish = True
+        self._space_at = None
 
     def _pick_candidate(self, idx: int) -> None:
         if idx >= len(self._candidates):

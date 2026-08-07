@@ -37,7 +37,7 @@ class Params:
     w_location: float = 1.0
     r_tunnel: float = 0.6      # location cost is free inside this radius
     # Frequency prior
-    lam: float = 0.025
+    lam: float = 0.03
     # Tap discrimination
     tap_path_len: float = 0.5  # shorter than this is a keypress, not a gesture
 
@@ -123,7 +123,8 @@ class Decoder:
         self.index: dict[tuple[str, str], list[int]] = {}
 
         for word, count in words:
-            col = _collapse(word)
+            # word may carry display casing (Kenny); geometry is lowercase-only.
+            col = _collapse(word.lower())
             if len(col) < 2 or any(c not in centers for c in col):
                 continue
             i = len(self.words)

@@ -158,6 +158,65 @@ def main() -> int:
     check("small drag is still a tap", h.drain(),
           ["type --clearmodifiers --delay 0 -- g"])
 
+    print("titlecase suggestions")
+    h.swipe("kenny")
+    check("name inserts capitalised", h.drain(),
+          ["type --clearmodifiers --delay 0 -- Kenny "])
+    h.swipe("hello", seed=3)
+    h.drain()
+    check("common word stays lowercase", "hello" in h.board._candidates, True)
+
+    print("space behavior")
+    clock = [0.0]
+    h.board._now = lambda: clock[0]
+
+    h.swipe("hello")
+    h.drain()
+    h.tap_key("space")
+    check("first space after swipe swallowed", h.drain(), [])
+    check("candidates survive swallowed space", len(h.board._candidates), 5)
+    clock[0] += 0.2
+    h.tap_key("space")
+    check("second space -> period", h.drain(),
+          ["key --clearmodifiers BackSpace",
+           "type --clearmodifiers --delay 0 -- . "])
+
+    clock[0] += 5.0
+    h.tap_key("a")
+    h.drain()
+    h.tap_key("space")
+    check("single space after letter types", h.drain(),
+          ["type --clearmodifiers --delay 0 --  "])
+    clock[0] += 0.2
+    h.tap_key("space")
+    check("double space after letter -> period", h.drain(),
+          ["key --clearmodifiers BackSpace",
+           "type --clearmodifiers --delay 0 -- . "])
+
+    clock[0] += 5.0
+    h.tap_key("a")
+    h.drain()
+    h.tap_key("space")
+    clock[0] += 2.0
+    h.tap_key("space")
+    check("slow second space stays a space", h.drain(),
+          ["type --clearmodifiers --delay 0 --  ",
+           "type --clearmodifiers --delay 0 --  "])
+
+    h.tap_key(".")
+    h.drain()
+    h.tap_key("space")
+    clock[0] += 0.2
+    h.tap_key("space")
+    check("no period after punctuation", h.drain(),
+          ["type --clearmodifiers --delay 0 --  ",
+           "type --clearmodifiers --delay 0 --  "])
+
+    h.tap_key("ctrl")
+    h.tap_key("space")
+    check("ctrl+space passes through", h.drain(),
+          ["key --clearmodifiers ctrl+space"])
+
     print("shift + swipe")
     h.tap_key("⇧")
     h.swipe("important")

@@ -71,7 +71,7 @@ is 1×1, so tuning is resolution-independent and templates stay valid for the li
 process.
 
 1. **Endpoint prune** — first/last letter must be within `r_endpoint` of the gesture's start
-   and end. A `(first, last) -> [words]` index makes this a dict hit, not a 29k scan.
+   and end. A `(first, last) -> [words]` index makes this a dict hit, not a 39k scan.
 2. **Corridor prune** — the word's letters must appear, in order, among the keys the path
    passed within `r_corridor` of. Falls back to the endpoint set if it leaves under 5
    candidates, so a clipped corner doesn't cost you the word.
@@ -95,8 +95,15 @@ At the tuned defaults (n=2000):
 
 | sample | top-1 | top-3 | top-5 | decode |
 |---|---|---|---|---|
-| frequency-weighted | 86.2% | 95.2% | 97.0% | 3.9 ms mean, 12.3 ms p95 |
-| uniform over vocabulary | 70.7% | 88.1% | 92.7% | 6.5 ms mean |
+| frequency-weighted | 84.0% | 95.0% | 96.8% | 4.1 ms mean, 11.3 ms p95 |
+| uniform over vocabulary | 64.5% | 84.2% | 89.8% | 6.9 ms mean |
+
+(These are a couple of points below the numbers first measured at 29.5k words: the lexicon
+now case-folds the Onboard model instead of dropping every capitalised entry, which adds
+~10k words — names, places, `OK` — and with them more confusable neighbours. Words whose
+Titlecase form is ≥95% dominant in the corpus, i.e. genuine proper nouns rather than
+sentence-initial noise, keep it as their display form, so swiping k-e-n-n-y suggests
+`Kenny`.)
 
 Frequency-weighted is what typing actually feels like, since you write `the` far more often
 than `thew`. Uniform is the rare-word case, where the candidate bar does the work.
