@@ -42,6 +42,9 @@ LOCKED = (1.0, 0.706, 0.329)
 TRAIL_MAX = 400
 N_CANDIDATES = 5
 
+# Fraction of screen height for the whole board, candidate bar included.
+BOARD_HEIGHT_FRAC = 0.36
+
 
 def _mono_layout(cr):
     """Pango layout with greyscale antialiasing.
@@ -127,8 +130,10 @@ class Board(Gtk.Window):
 
         self.width = geo.width
         self.unit_w = self.width / GRID_COLS
-        # Whole board (candidate bar + 5 key rows) takes ~42% of screen height.
-        total = int(geo.height * 0.42)
+        # Whole board (candidate bar + key rows) takes this much screen height.
+        # Kept low deliberately: this gets used over a terminal, and every row
+        # the board takes is a row of scrollback you cannot see.
+        total = int(geo.height * BOARD_HEIGHT_FRAC)
         self.row_h = total / (GRID_ROWS + 1.0)
         self.bar_h = self.row_h
         self.height = int(self.bar_h + GRID_ROWS * self.row_h)

@@ -41,8 +41,27 @@ No numpy, no build step, no Rust toolchain.
 - **Modifiers latch**: tap `ctrl` → applies to the next key (blue ring); tap again → locked
   (amber ring); tap a third time → off. So Ctrl+T is two taps, not a chord.
 - **Shift** applies to the next tap, or capitalises the next swiped word.
-- `?123` switches layers; on the symbols layer the arrow keys become Home/PgDn/PgUp/End.
+- `?123` switches layers; on the symbols layer `home`/`end` become `pgup`/`pgdn`. The arrows
+  never move.
 - `▼` hides the board; the floating ⌨ brings it back.
+
+## Layout
+
+Shaped for terminal work:
+
+- **Left column** — `esc`, `tab`, `⇧`, `ctrl`, one per letter row, where a real keyboard has
+  them. Ctrl-chords are two taps and never leave the left edge.
+- **Right** — `⌫` and `▼` top, `⏎` below, then a proper inverted-T arrow cluster with
+  `home`/`end` above it. Arrows stay put across layers.
+- **Primary layer** carries `-`, `/` and `|` as well as `,` `.`, so paths, flags and pipes
+  don't need a layer switch. Shift gives `_ ? \ < >`.
+- The letters keep the standard QWERTY stagger (+0.5, +1.0). That has to be stated explicitly
+  now that shift sits in the left column rather than indenting the row itself — get it wrong
+  and `z` lands left of `a`, which costs both muscle memory and about 1.5 points of decoder
+  accuracy.
+
+The board is 4 key rows plus the candidate bar, at `BOARD_HEIGHT_FRAC` (0.36) of screen
+height — deliberately low, since every row it occupies is a row of scrollback you can't see.
 
 ## How the decoder works
 
@@ -76,8 +95,8 @@ At the tuned defaults (n=2000):
 
 | sample | top-1 | top-3 | top-5 | decode |
 |---|---|---|---|---|
-| frequency-weighted | 85.9% | 95.0% | 97.0% | 3.8 ms mean, 12.4 ms p95 |
-| uniform over vocabulary | 71.4% | 88.4% | 93.0% | 6.7 ms mean |
+| frequency-weighted | 86.2% | 95.2% | 97.0% | 3.9 ms mean, 12.3 ms p95 |
+| uniform over vocabulary | 70.7% | 88.1% | 92.7% | 6.5 ms mean |
 
 Frequency-weighted is what typing actually feels like, since you write `the` far more often
 than `thew`. Uniform is the rare-word case, where the candidate bar does the work.
